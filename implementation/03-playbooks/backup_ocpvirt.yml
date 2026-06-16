@@ -5,6 +5,7 @@
   gather_facts: false
 
   vars:
+    ocpvirt_namespace: vm-workloads
     # The redhat.openshift_virtualization inventory plugin prefixes the
     # namespace to the hostname (vm-workloads-rhel9-app-01). Strip it to
     # get the actual VirtualMachine resource name for k8s API calls.

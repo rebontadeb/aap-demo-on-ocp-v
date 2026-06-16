@@ -5,6 +5,7 @@
   gather_facts: false
 
   vars:
+    ocpvirt_namespace: vm-workloads
     # Strip the namespace prefix added by the inventory plugin.
     vm_name: "{{ inventory_hostname | regex_replace('^' + ocpvirt_namespace + '-', '') }}"
 
