@@ -1,8 +1,12 @@
 ---
 - name: Restore OpenShift Virtualization VM from snapshot
-  hosts: ocpvirt_vms
+  hosts: namespace_vm_workloads
   connection: local   # talks to Cluster B's K8s API, not to the VM itself
   gather_facts: false
+
+  vars:
+    # Strip the namespace prefix added by the inventory plugin.
+    vm_name: "{{ inventory_hostname | regex_replace('^' + ocpvirt_namespace + '-', '') }}"
 
   tasks:
     # Two callers reach this playbook:
@@ -14,13 +18,13 @@
     - name: Look up the latest pre-patch snapshot if none was supplied
       when: snapshot_name is not defined
       block:
-        - name: List snapshots for {{ inventory_hostname }}
+        - name: List snapshots for {{ vm_name }}
           kubernetes.core.k8s_info:
             api_version: snapshot.kubevirt.io/v1beta1
             kind: VirtualMachineSnapshot
             namespace: "{{ ocpvirt_namespace }}"
             label_selectors:
-              - "vm-name={{ inventory_hostname }}"
+              - "vm-name={{ vm_name }}"
           register: snapshots
 
         - name: Select the newest snapshot
@@ -31,27 +35,27 @@
                   | sort(attribute='metadata.creationTimestamp')
                   | last).metadata.name }}
 
-    - name: Create VirtualMachineRestore for {{ inventory_hostname }}
+    - name: Create VirtualMachineRestore for {{ vm_name }}
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: snapshot.kubevirt.io/v1beta1
           kind: VirtualMachineRestore
           metadata:
-            name: "restore-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+            name: "restore-{{ tower_job_id | default('manual') }}-{{ vm_name }}"
             namespace: "{{ ocpvirt_namespace }}"
           spec:
             target:
               apiGroup: kubevirt.io
               kind: VirtualMachine
-              name: "{{ inventory_hostname }}"
+              name: "{{ vm_name }}"
             virtualMachineSnapshotName: "{{ snapshot_name }}"
 
     - name: Wait for the restore to complete
       kubernetes.core.k8s_info:
         api_version: snapshot.kubevirt.io/v1beta1
         kind: VirtualMachineRestore
-        name: "restore-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+        name: "restore-{{ tower_job_id | default('manual') }}-{{ vm_name }}"
         namespace: "{{ ocpvirt_namespace }}"
       register: restore_status
       until: restore_status.resources[0].status.complete | default(false)
@@ -60,4 +64,4 @@
 
     - name: Show what was restored
       ansible.builtin.debug:
-        msg: "Restored {{ inventory_hostname }} from snapshot {{ snapshot_name }}"
+        msg: "Restored {{ vm_name }} from snapshot {{ snapshot_name }}"

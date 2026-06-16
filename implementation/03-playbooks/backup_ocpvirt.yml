@@ -1,14 +1,18 @@
 ---
 - name: Backup OpenShift Virtualization VM (pre-patch snapshot)
-  hosts: ocpvirt_vms
+  hosts: namespace_vm_workloads
   connection: local   # talks to Cluster B's K8s API, not to the VM itself
   gather_facts: false
 
   vars:
-    snapshot_name: "pre-patch-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+    # The redhat.openshift_virtualization inventory plugin prefixes the
+    # namespace to the hostname (vm-workloads-rhel9-app-01). Strip it to
+    # get the actual VirtualMachine resource name for k8s API calls.
+    vm_name: "{{ inventory_hostname | regex_replace('^' + ocpvirt_namespace + '-', '') }}"
+    snapshot_name: "pre-patch-{{ tower_job_id | default('manual') }}-{{ vm_name }}"
 
   tasks:
-    - name: Create VirtualMachineSnapshot for {{ inventory_hostname }}
+    - name: Create VirtualMachineSnapshot for {{ vm_name }}
       kubernetes.core.k8s:
         state: present
         definition:
@@ -18,12 +22,12 @@
             name: "{{ snapshot_name }}"
             namespace: "{{ ocpvirt_namespace }}"
             labels:
-              vm-name: "{{ inventory_hostname }}"
+              vm-name: "{{ vm_name }}"
           spec:
             source:
               apiGroup: kubevirt.io
               kind: VirtualMachine
-              name: "{{ inventory_hostname }}"
+              name: "{{ vm_name }}"
 
     - name: Wait for the snapshot to be ready
       kubernetes.core.k8s_info:
@@ -44,4 +48,4 @@
 
     - name: Show the snapshot name (useful for ad-hoc runs)
       ansible.builtin.debug:
-        msg: "Created snapshot {{ snapshot_name }} for {{ inventory_hostname }}"
+        msg: "Created snapshot {{ snapshot_name }} for {{ vm_name }}"
