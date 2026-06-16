@@ -1,0 +1,126 @@
+---
+# Creates every Automation Controller object this demo needs:
+# organization, credentials, project, execution environments, inventory +
+# SCM inventory source, job templates, and the patch-cycle workflow with
+# its nodes - all driven by vars/controller_objects.yml.
+#
+# Idempotent - safe to re-run after editing controller_objects.yml. See
+# ../06-running-the-demo.md for the full end-to-end sequence.
+
+- name: Configure Automation Controller objects for the VM lifecycle demo
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/controller_auth.yml
+    - vars/controller_secrets.yml
+    - vars/controller_objects.yml
+
+  vars:
+    # Flip to true only once a real VMware/vCenter environment exists.
+    # While false, every object below marked "_executed: false" - the
+    # VMware credential, EE, job templates, and workflow - is skipped.
+    apply_vmware_objects: false
+
+  # Applies controller_host / controller_oauthtoken / validate_certs to
+  # every ansible.controller.* task below, so they don't need repeating.
+  # If your installed collection version doesn't define this action group,
+  # ansible-doc -l ansible.controller will show no group changes and these
+  # tasks will fail auth - in that case, pass the three params explicitly
+  # on each task instead.
+  module_defaults:
+    group/ansible.controller.controller:
+      controller_host: "{{ controller_host }}"
+      controller_oauthtoken: "{{ controller_oauthtoken }}"
+      validate_certs: "{{ controller_validate_certs }}"
+
+  tasks:
+    - name: Create the VM Operations organization
+      ansible.controller.organization:
+        name: "{{ org_name }}"
+        state: present
+
+    - name: Create credentials
+      ansible.controller.credential:
+        name: "{{ item.name }}"
+        organization: "{{ org_name }}"
+        credential_type: "{{ item.credential_type }}"
+        inputs: "{{ item.inputs }}"
+        state: present
+      loop: "{{ credentials }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item._executed or apply_vmware_objects
+      no_log: true
+
+    - name: Create the project (this Git repository)
+      ansible.controller.project:
+        name: "{{ project_name }}"
+        organization: "{{ org_name }}"
+        scm_type: git
+        scm_url: "{{ project_scm_url }}"
+        scm_branch: "{{ project_scm_branch }}"
+        scm_update_on_launch: true
+        wait: true
+        state: present
+
+    - name: Register the ee-ocpvirt execution environment
+      ansible.controller.execution_environment:
+        name: "ee-ocpvirt"
+        image: "{{ ee_ocpvirt_image }}"
+        organization: "{{ org_name }}"
+        state: present
+
+    # NOT EXECUTED unless apply_vmware_objects is true - reference only.
+    - name: Register the ee-vmware execution environment
+      ansible.controller.execution_environment:
+        name: "ee-vmware"
+        image: "{{ ee_vmware_image }}"
+        organization: "{{ org_name }}"
+        state: present
+      when: apply_vmware_objects
+
+    - name: Create the VM Fleet inventory
+      ansible.controller.inventory:
+        name: "{{ inventory_name }}"
+        organization: "{{ org_name }}"
+        state: present
+
+    - name: Add an SCM inventory source, synced from the project
+      ansible.controller.inventory_source:
+        name: "VM Fleet - from Git"
+        inventory: "{{ inventory_name }}"
+        organization: "{{ org_name }}"
+        source: scm
+        source_project: "{{ project_name }}"
+        source_path: "implementation/02-inventory/hosts.yml"
+        overwrite: true
+        overwrite_vars: true
+        update_on_launch: true
+        state: present
+
+    - name: Create job templates
+      ansible.controller.job_template:
+        name: "{{ item.name }}"
+        organization: "{{ org_name }}"
+        job_type: run
+        inventory: "{{ inventory_name }}"
+        project: "{{ project_name }}"
+        playbook: "{{ item.playbook }}"
+        execution_environment: "{{ item.execution_environment }}"
+        credentials: "{{ item.credentials }}"
+        ask_limit_on_launch: true
+        state: present
+      loop: "{{ job_templates }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item._executed or apply_vmware_objects
+
+    - name: Create workflow job templates and their nodes
+      ansible.builtin.include_tasks: tasks/workflow_with_nodes.yml
+      loop: "{{ workflows }}"
+      loop_control:
+        loop_var: workflow
+        label: "{{ workflow.name }}"
+      when: workflow._executed or apply_vmware_objects

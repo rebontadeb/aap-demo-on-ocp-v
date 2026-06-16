@@ -1,0 +1,6 @@
+# NOT EXECUTED - reference only. No VMware infrastructure available
+# in this environment.
+---
+collections:
+  - name: community.vmware
+    version: ">=4.0.0"

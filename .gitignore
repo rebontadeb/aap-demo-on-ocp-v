@@ -1,0 +1,7 @@
+# AAP auth and secrets - never commit these
+implementation/05-controller-as-code/vars/controller_auth.yml
+implementation/05-controller-as-code/vars/eda_auth.yml
+implementation/05-controller-as-code/vars/controller_secrets.yml
+
+# ansible-builder generated context
+implementation/01-execution-environments/**/context/

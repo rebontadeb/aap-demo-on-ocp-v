@@ -1,0 +1,21 @@
+# NOT EXECUTED - reference only. No VMware infrastructure available
+# in this environment. Provided for parity with ee-ocpvirt/ - see
+# ../../chapters/09-two-platforms-one-process.md.
+---
+version: 3
+
+images:
+  base_image:
+    name: registry.redhat.io/ansible-automation-platform-25/ee-minimal-rhel9:latest
+
+dependencies:
+  galaxy: requirements.yml
+  python: requirements.txt
+
+additional_build_steps:
+  prepend_builder:
+    - RUN ln -sf /usr/bin/microdnf /usr/bin/dnf
+    - RUN sed -i 's#bindep -l newline | sort#bindep -l newline | grep -v openshift-clients | sort#' /output/scripts/assemble
+    - RUN sed -i 's#compile_packages=.*#compile_packages=$(bindep -b compile 2>/dev/null | grep -v openshift-clients || true)#' /output/scripts/assemble
+  prepend_final:
+    - RUN ln -sf /usr/bin/microdnf /usr/bin/dnf

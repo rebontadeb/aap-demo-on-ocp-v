@@ -1,0 +1,108 @@
+---
+# Non-secret definitions of every AAP object this demo creates. Consumed by
+# configure_controller.yml and configure_eda.yml. Image references and the
+# project's Git URL are placeholders - fill in for your environment.
+
+org_name: "VM Operations"
+
+# This Git repository (or your fork), used as the Project source for both
+# Automation Controller and EDA Controller.
+project_name: "vm-lifecycle-automation"
+project_scm_url: "https://github.com/<your-org>/ansible-automation-demo.git"
+project_scm_branch: "main"
+
+inventory_name: "VM Fleet"
+
+# Built and pushed in ../01-execution-environments/ - see its README.
+ee_ocpvirt_image: "<your-private-hub>/ee-ocpvirt:latest"
+de_self_heal_image: "<your-private-hub>/de-self-heal:latest"
+
+# NOT EXECUTED - reference only. No VMware infrastructure available.
+ee_vmware_image: "<your-private-hub>/ee-vmware:latest"
+
+credentials:
+  - name: ocpvirt-api-token
+    credential_type: "OpenShift or Kubernetes API Bearer Token"
+    inputs:
+      host: "{{ ocpvirt_api_host }}"
+      bearer_token: "{{ ocpvirt_bearer_token }}"
+      verify_ssl: false
+    _executed: true
+
+  - name: vm-guest-ssh
+    credential_type: "Machine"
+    inputs:
+      username: "cloud-user"
+      ssh_key_data: "{{ vm_guest_ssh_private_key }}"
+      become_method: "sudo"
+    _executed: true
+
+  # NOT EXECUTED - reference only. No VMware infrastructure available.
+  - name: vcenter-creds
+    credential_type: "VMware vCenter"
+    inputs:
+      vcenter_host: "{{ vcenter_host }}"
+      vcenter_username: "{{ vcenter_username }}"
+      vcenter_password: "{{ vcenter_password }}"
+    _executed: false
+
+job_templates:
+  - name: "Backup VM - OpenShift Virtualization"
+    playbook: "implementation/03-playbooks/backup_ocpvirt.yml"
+    execution_environment: "ee-ocpvirt"
+    credentials: ["ocpvirt-api-token"]
+    _executed: true
+
+  - name: "Patch & Health-Check VM"
+    playbook: "implementation/03-playbooks/patch_and_healthcheck.yml"
+    execution_environment: "Default execution environment"
+    credentials: ["vm-guest-ssh"]
+    _executed: true
+
+  - name: "Restore VM - OpenShift Virtualization"
+    playbook: "implementation/03-playbooks/restore_ocpvirt.yml"
+    execution_environment: "ee-ocpvirt"
+    credentials: ["ocpvirt-api-token"]
+    _executed: true
+
+  # NOT EXECUTED - reference only. No VMware infrastructure available.
+  - name: "Backup VM - VMware"
+    playbook: "implementation/03-playbooks/backup_vmware.yml"
+    execution_environment: "ee-vmware"
+    credentials: ["vcenter-creds"]
+    _executed: false
+
+  - name: "Restore VM - VMware"
+    playbook: "implementation/03-playbooks/restore_vmware.yml"
+    execution_environment: "ee-vmware"
+    credentials: ["vcenter-creds"]
+    _executed: false
+
+workflows:
+  - name: "VM Patch Cycle - OpenShift Virtualization"
+    _executed: true
+    nodes:
+      - identifier: backup
+        unified_job_template: "Backup VM - OpenShift Virtualization"
+        success_nodes: ["patch"]
+      - identifier: patch
+        unified_job_template: "Patch & Health-Check VM"
+        failure_nodes: ["restore"]
+      - identifier: restore
+        unified_job_template: "Restore VM - OpenShift Virtualization"
+
+  # NOT EXECUTED - reference only. No VMware infrastructure available.
+  # Note this reuses the same "Patch & Health-Check VM" job template as the
+  # OpenShift Virtualization workflow - patching happens over SSH to the
+  # guest OS, so it's identical regardless of the underlying hypervisor.
+  - name: "VM Patch Cycle - VMware"
+    _executed: false
+    nodes:
+      - identifier: backup
+        unified_job_template: "Backup VM - VMware"
+        success_nodes: ["patch"]
+      - identifier: patch
+        unified_job_template: "Patch & Health-Check VM"
+        failure_nodes: ["restore"]
+      - identifier: restore
+        unified_job_template: "Restore VM - VMware"

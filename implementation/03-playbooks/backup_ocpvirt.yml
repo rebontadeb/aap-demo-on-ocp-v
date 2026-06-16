@@ -1,0 +1,47 @@
+---
+- name: Backup OpenShift Virtualization VM (pre-patch snapshot)
+  hosts: ocpvirt_vms
+  connection: local   # talks to Cluster B's K8s API, not to the VM itself
+  gather_facts: false
+
+  vars:
+    snapshot_name: "pre-patch-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+
+  tasks:
+    - name: Create VirtualMachineSnapshot for {{ inventory_hostname }}
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: snapshot.kubevirt.io/v1beta1
+          kind: VirtualMachineSnapshot
+          metadata:
+            name: "{{ snapshot_name }}"
+            namespace: "{{ ocpvirt_namespace }}"
+            labels:
+              vm-name: "{{ inventory_hostname }}"
+          spec:
+            source:
+              apiGroup: kubevirt.io
+              kind: VirtualMachine
+              name: "{{ inventory_hostname }}"
+
+    - name: Wait for the snapshot to be ready
+      kubernetes.core.k8s_info:
+        api_version: snapshot.kubevirt.io/v1beta1
+        kind: VirtualMachineSnapshot
+        name: "{{ snapshot_name }}"
+        namespace: "{{ ocpvirt_namespace }}"
+      register: snap_status
+      until: snap_status.resources[0].status.readyToUse | default(false)
+      retries: 30
+      delay: 10
+
+    - name: Record snapshot name for the workflow
+      ansible.builtin.set_stats:
+        data:
+          snapshot_name: "{{ snapshot_name }}"
+        per_host: true
+
+    - name: Show the snapshot name (useful for ad-hoc runs)
+      ansible.builtin.debug:
+        msg: "Created snapshot {{ snapshot_name }} for {{ inventory_hostname }}"

@@ -1,0 +1,63 @@
+---
+- name: Restore OpenShift Virtualization VM from snapshot
+  hosts: ocpvirt_vms
+  connection: local   # talks to Cluster B's K8s API, not to the VM itself
+  gather_facts: false
+
+  tasks:
+    # Two callers reach this playbook:
+    #  1. The "VM Patch Cycle" workflow, which passes `snapshot_name` as a
+    #     set_stats artifact from the backup step of the SAME run.
+    #  2. The EDA self-heal rulebook (04-rulebooks/self_heal_vm.yml), which
+    #     calls this job template independently, hours later, with no
+    #     `snapshot_name` - so the most recent pre-patch snapshot is used.
+    - name: Look up the latest pre-patch snapshot if none was supplied
+      when: snapshot_name is not defined
+      block:
+        - name: List snapshots for {{ inventory_hostname }}
+          kubernetes.core.k8s_info:
+            api_version: snapshot.kubevirt.io/v1beta1
+            kind: VirtualMachineSnapshot
+            namespace: "{{ ocpvirt_namespace }}"
+            label_selectors:
+              - "vm-name={{ inventory_hostname }}"
+          register: snapshots
+
+        - name: Select the newest snapshot
+          ansible.builtin.set_fact:
+            snapshot_name: >-
+              {{ (snapshots.resources
+                  | selectattr('metadata.name', 'match', '^pre-patch-')
+                  | sort(attribute='metadata.creationTimestamp')
+                  | last).metadata.name }}
+
+    - name: Create VirtualMachineRestore for {{ inventory_hostname }}
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: snapshot.kubevirt.io/v1beta1
+          kind: VirtualMachineRestore
+          metadata:
+            name: "restore-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+            namespace: "{{ ocpvirt_namespace }}"
+          spec:
+            target:
+              apiGroup: kubevirt.io
+              kind: VirtualMachine
+              name: "{{ inventory_hostname }}"
+            virtualMachineSnapshotName: "{{ snapshot_name }}"
+
+    - name: Wait for the restore to complete
+      kubernetes.core.k8s_info:
+        api_version: snapshot.kubevirt.io/v1beta1
+        kind: VirtualMachineRestore
+        name: "restore-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+        namespace: "{{ ocpvirt_namespace }}"
+      register: restore_status
+      until: restore_status.resources[0].status.complete | default(false)
+      retries: 30
+      delay: 10
+
+    - name: Show what was restored
+      ansible.builtin.debug:
+        msg: "Restored {{ inventory_hostname }} from snapshot {{ snapshot_name }}"

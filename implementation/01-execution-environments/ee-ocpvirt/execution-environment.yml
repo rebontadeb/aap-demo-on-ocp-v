@@ -1,0 +1,26 @@
+---
+version: 3
+images:
+  base_image:
+    name: registry.redhat.io/ansible-automation-platform-25/ee-minimal-rhel9:latest
+dependencies:
+  galaxy: requirements.yml
+  python: requirements.txt
+additional_build_steps:
+  prepend_builder:
+    # The generated Containerfile passes PKGMGR=/usr/bin/dnf via ARG, which
+    # bypasses the assemble script's microdnf auto-detection. Symlinking
+    # microdnf -> dnf makes all $PKGMGR calls (install, clean) work on the
+    # ee-minimal-rhel9 base image, which ships only microdnf.
+    - RUN ln -sf /usr/bin/microdnf /usr/bin/dnf
+    # kubernetes.core's bindep.txt lists openshift-clients as a compile-time
+    # system dep. Our playbooks only use k8s / k8s_info which talk to the
+    # API via the Python kubernetes library - no oc CLI needed. Filter it
+    # out of both the runtime package list and the compile step so the build
+    # doesn't try to dnf-install an RPM that isn't in UBI repos.
+    - RUN sed -i 's#bindep -l newline | sort#bindep -l newline | grep -v openshift-clients | sort#' /output/scripts/assemble
+    - RUN sed -i 's#compile_packages=.*#compile_packages=$(bindep -b compile 2>/dev/null | grep -v openshift-clients || true)#' /output/scripts/assemble
+  prepend_final:
+    # install-from-bindep in the final stage has the same $PKGMGR clean all
+    # step - needs the same symlink.
+    - RUN ln -sf /usr/bin/microdnf /usr/bin/dnf

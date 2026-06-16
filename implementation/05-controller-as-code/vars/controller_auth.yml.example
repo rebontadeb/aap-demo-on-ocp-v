@@ -1,0 +1,9 @@
+---
+# Copy to controller_auth.yml (gitignored - see ../../06-running-the-demo.md)
+# and fill in real values.
+#
+# Personal Access Token from Automation Controller -> User Access ->
+# Users -> <you> -> Tokens. See ../../00-prerequisites.md, Cluster A, item 4.
+controller_host: "https://aap-controller.apps.cluster-a.example.com"
+controller_oauthtoken: "{{ lookup('env', 'CONTROLLER_TOKEN') }}"
+controller_validate_certs: true

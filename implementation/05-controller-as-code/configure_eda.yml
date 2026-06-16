@@ -1,0 +1,55 @@
+---
+# Registers the self-healing rulebook (../04-rulebooks/self_heal_vm.yml)
+# with EDA Controller: a Project pointing at this Git repo, the
+# de-self-heal Decision Environment, and a Rulebook Activation that runs it
+# continuously.
+#
+# Idempotent. Run after configure_controller.yml - see
+# ../06-running-the-demo.md for the full sequence.
+#
+# NOTE: ansible.eda module parameters below were not independently verified
+# against a running AAP 2.5 instance. Before running, check them with:
+#   ansible-doc ansible.eda.project
+#   ansible-doc ansible.eda.decision_environment
+#   ansible-doc ansible.eda.rulebook_activation
+# and adjust parameter names if your installed collection version differs.
+
+- name: Configure EDA Controller objects for the self-healing use case
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/eda_auth.yml
+    - vars/controller_objects.yml
+
+  tasks:
+    - name: Create an EDA project pointing at this Git repository
+      ansible.eda.project:
+        name: "{{ project_name }}"
+        url: "{{ project_scm_url }}"
+        organization_name: "{{ org_name }}"
+        state: present
+        controller_host: "{{ eda_controller_host }}"
+        controller_token: "{{ eda_controller_token }}"
+
+    - name: Register the de-self-heal Decision Environment
+      ansible.eda.decision_environment:
+        name: "de-self-heal"
+        image_url: "{{ de_self_heal_image }}"
+        organization_name: "{{ org_name }}"
+        state: present
+        controller_host: "{{ eda_controller_host }}"
+        controller_token: "{{ eda_controller_token }}"
+
+    - name: Activate the self-healing rulebook
+      ansible.eda.rulebook_activation:
+        name: "Self-heal VMs after delayed patch failures"
+        project_name: "{{ project_name }}"
+        rulebook_name: "implementation/04-rulebooks/self_heal_vm.yml"
+        decision_environment_name: "de-self-heal"
+        organization_name: "{{ org_name }}"
+        restart_policy: "always"
+        state: present
+        controller_host: "{{ eda_controller_host }}"
+        controller_token: "{{ eda_controller_token }}"

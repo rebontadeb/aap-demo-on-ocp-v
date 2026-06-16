@@ -1,0 +1,39 @@
+# NOT EXECUTED - reference only. No VMware infrastructure available
+# in this environment. Provided for parity with restore_ocpvirt.yml - see
+# ../../chapters/09-two-platforms-one-process.md.
+---
+- name: Restore VMware VM from snapshot
+  hosts: vmware_vms
+  connection: local   # talks to vCenter's API, not to the VM itself
+  gather_facts: false
+
+  tasks:
+    # Same two-caller pattern as restore_ocpvirt.yml: the workflow passes
+    # snapshot_name as an artifact; the EDA rulebook does not.
+    - name: Look up the latest pre-patch snapshot if none was supplied
+      when: snapshot_name is not defined
+      block:
+        - name: Gather snapshot info for {{ inventory_hostname }}
+          community.vmware.vmware_guest_snapshot_info:
+            validate_certs: false
+            datacenter: "{{ vcenter_datacenter }}"
+            folder: "{{ vcenter_folder }}"
+            name: "{{ inventory_hostname }}"
+          register: snap_info
+
+        - name: Select the newest pre-patch snapshot
+          ansible.builtin.set_fact:
+            snapshot_name: >-
+              {{ (snap_info.guest_snapshots.snapshots
+                  | selectattr('name', 'match', '^pre-patch-')
+                  | sort(attribute='create_time')
+                  | last).name }}
+
+    - name: Revert {{ inventory_hostname }} to its pre-patch snapshot
+      community.vmware.vmware_guest_snapshot:
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        folder: "{{ vcenter_folder }}"
+        name: "{{ inventory_hostname }}"
+        state: revert
+        snapshot_name: "{{ snapshot_name }}"

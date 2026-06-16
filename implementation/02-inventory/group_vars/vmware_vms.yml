@@ -1,0 +1,11 @@
+# NOT EXECUTED - reference only. No VMware infrastructure available
+# in this environment. See ../../00-prerequisites.md.
+---
+vm_platform: vmware
+vcenter_datacenter: DC1
+vcenter_folder: /DC1/vm/Production
+
+# As with ocpvirt_vms.yml, no vCenter connection details here: the
+# "VMware vCenter" credential injects VMWARE_HOST, VMWARE_USER,
+# VMWARE_PASSWORD and VMWARE_VALIDATE_CERTS, which community.vmware
+# modules read automatically.

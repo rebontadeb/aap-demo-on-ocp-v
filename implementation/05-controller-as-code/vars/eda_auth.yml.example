@@ -1,0 +1,11 @@
+---
+# Copy to eda_auth.yml (gitignored - see ../../06-running-the-demo.md) and
+# fill in real values.
+#
+# In AAP 2.5, EDA Controller is served through the same Gateway as
+# Automation Controller - usually the same host, under /api/eda/v1/. If
+# your installation routes EDA Controller separately, use that host here.
+# Personal Access Token from EDA Controller -> Users -> <you> -> Tokens.
+# See ../../00-prerequisites.md, Cluster A, item 4.
+eda_controller_host: "https://aap-controller.apps.cluster-a.example.com"
+eda_controller_token: "{{ lookup('env', 'EDA_CONTROLLER_TOKEN') }}"

@@ -1,0 +1,58 @@
+---
+- name: Patch VM and verify health
+  hosts: all   # launched with limit=<vm-name> by the workflow / EDA
+  become: true
+
+  tasks:
+    - name: Patch all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      register: patch_result
+
+    - name: Reboot if packages were updated
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+      when: patch_result.changed
+
+    - name: Wait for the VM to come back online
+      ansible.builtin.wait_for_connection:
+        delay: 10
+        timeout: 300
+
+    - name: Check that the critical service is active
+      ansible.builtin.systemd:
+        name: "{{ health_check_service }}"
+        state: started
+      check_mode: true
+      register: service_status
+      failed_when: false
+
+    - name: Check that the application port responds locally
+      ansible.builtin.wait_for:
+        port: "{{ health_check_port }}"
+        host: 127.0.0.1
+        timeout: 30
+        state: started
+      register: port_check
+      failed_when: false
+
+    - name: Determine overall patch health
+      ansible.builtin.set_fact:
+        patch_healthy: >-
+          {{ (service_status.status.ActiveState | default('') == 'active')
+             and (port_check.state | default('') == 'started') }}
+
+    - name: Record health-check result for the workflow
+      ansible.builtin.set_stats:
+        data:
+          patch_healthy: "{{ patch_healthy }}"
+        per_host: true
+
+    - name: Fail this host if the health check did not pass
+      ansible.builtin.fail:
+        msg: >-
+          Post-patch health check failed for {{ inventory_hostname }}:
+          service '{{ health_check_service }}' active={{ service_status.status.ActiveState | default('unknown') }},
+          port {{ health_check_port }} state={{ port_check.state | default('unknown') }}
+      when: not patch_healthy

@@ -1,0 +1,9 @@
+---
+vm_platform: ocpvirt
+ocpvirt_namespace: vm-workloads
+
+# No K8s API connection details here on purpose: the
+# "OpenShift or Kubernetes API Bearer Token" credential attached to the
+# Backup/Restore job templates injects K8S_AUTH_HOST, K8S_AUTH_API_KEY and
+# K8S_AUTH_VERIFY_SSL as environment variables, which kubernetes.core
+# modules read automatically. See 03-playbooks/README.md.

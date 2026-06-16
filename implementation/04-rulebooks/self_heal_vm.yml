@@ -1,0 +1,40 @@
+---
+- name: Self-heal VMs after delayed post-patch failures
+  hosts: all
+
+  sources:
+    - ansible.eda.webhook:
+        host: 0.0.0.0
+        port: 5000
+        # Default endpoint path is /endpoint - verify against your
+        # installed ansible.eda version with:
+        #   ansible-doc ansible.eda.webhook
+
+  rules:
+    - name: Restore OpenShift Virtualization VM on delayed service failure
+      condition: >-
+        event.payload.status == "firing" and
+        event.payload.labels.alertname == "VMServiceDown" and
+        event.payload.labels.platform == "ocpvirt"
+      action:
+        run_job_template:
+          name: "Restore VM - OpenShift Virtualization"
+          organization: "VM Operations"
+          job_args:
+            limit: "{{ event.payload.labels.vm_name }}"
+
+    # NOT EXECUTED - reference only. No VMware infrastructure available
+    # in this environment. Same shape as the rule above - only the target
+    # job template and the "platform" label differ. See
+    # ../../chapters/09-two-platforms-one-process.md.
+    - name: Restore VMware VM on delayed service failure
+      condition: >-
+        event.payload.status == "firing" and
+        event.payload.labels.alertname == "VMServiceDown" and
+        event.payload.labels.platform == "vmware"
+      action:
+        run_job_template:
+          name: "Restore VM - VMware"
+          organization: "VM Operations"
+          job_args:
+            limit: "{{ event.payload.labels.vm_name }}"

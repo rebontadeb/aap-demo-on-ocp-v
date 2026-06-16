@@ -1,0 +1,6 @@
+---
+ansible_user: cloud-user
+
+# Used by 03-playbooks/patch_and_healthcheck.yml
+health_check_service: httpd
+health_check_port: 443

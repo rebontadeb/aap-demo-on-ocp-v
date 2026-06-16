@@ -1,0 +1,30 @@
+# NOT EXECUTED - reference only. No VMware infrastructure available
+# in this environment. Provided for parity with backup_ocpvirt.yml - see
+# ../../chapters/09-two-platforms-one-process.md.
+---
+- name: Backup VMware VM (pre-patch snapshot)
+  hosts: vmware_vms
+  connection: local   # talks to vCenter's API, not to the VM itself
+  gather_facts: false
+
+  vars:
+    snapshot_name: "pre-patch-{{ tower_job_id | default('manual') }}-{{ inventory_hostname }}"
+
+  tasks:
+    - name: Create vSphere snapshot for {{ inventory_hostname }}
+      community.vmware.vmware_guest_snapshot:
+        validate_certs: false
+        datacenter: "{{ vcenter_datacenter }}"
+        folder: "{{ vcenter_folder }}"
+        name: "{{ inventory_hostname }}"
+        state: present
+        snapshot_name: "{{ snapshot_name }}"
+        description: "Pre-patch snapshot, AAP job {{ tower_job_id | default('manual') }}"
+        quiesce: true
+        memory_dump: false
+
+    - name: Record snapshot name for the workflow
+      ansible.builtin.set_stats:
+        data:
+          snapshot_name: "{{ snapshot_name }}"
+        per_host: true
