@@ -8,17 +8,17 @@ org_name: "VM Operations"
 # This Git repository (or your fork), used as the Project source for both
 # Automation Controller and EDA Controller.
 project_name: "vm-lifecycle-automation"
-project_scm_url: "https://github.com/<your-org>/ansible-automation-demo.git"
+project_scm_url: "https://github.com/rebontadeb/aap-demo-on-ocp-v.git"
 project_scm_branch: "main"
 
 inventory_name: "VM Fleet"
 
 # Built and pushed in ../01-execution-environments/ - see its README.
-ee_ocpvirt_image: "<your-private-hub>/ee-ocpvirt:latest"
-de_self_heal_image: "<your-private-hub>/de-self-heal:latest"
+ee_ocpvirt_image: "quay.io/rebontadeb/ansible/ee-ocpvirt"
+de_self_heal_image: "quay.io/rebontadeb/ansible/de-self-heal"
 
 # NOT EXECUTED - reference only. No VMware infrastructure available.
-ee_vmware_image: "<your-private-hub>/ee-vmware:latest"
+ee_vmware_image: "quay.io/rebontadeb/ansible/ee-vmware"
 
 credentials:
   - name: ocpvirt-api-token

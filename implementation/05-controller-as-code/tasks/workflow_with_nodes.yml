@@ -3,14 +3,14 @@
 # current item available as `workflow`.
 
 - name: "Create workflow job template: {{ workflow.name }}"
-  ansible.controller.workflow_job_template:
+  awx.awx.workflow_job_template:
     name: "{{ workflow.name }}"
     organization: "{{ org_name }}"
     ask_limit_on_launch: true
     state: present
 
 - name: "Add workflow nodes for: {{ workflow.name }}"
-  ansible.controller.workflow_job_template_node:
+  awx.awx.workflow_job_template_node:
     workflow_job_template: "{{ workflow.name }}"
     organization: "{{ org_name }}"
     identifier: "{{ item.identifier }}"

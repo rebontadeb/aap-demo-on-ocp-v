@@ -23,26 +23,20 @@
     # VMware credential, EE, job templates, and workflow - is skipped.
     apply_vmware_objects: false
 
-  # Applies controller_host / controller_oauthtoken / validate_certs to
-  # every ansible.controller.* task below, so they don't need repeating.
-  # If your installed collection version doesn't define this action group,
-  # ansible-doc -l ansible.controller will show no group changes and these
-  # tasks will fail auth - in that case, pass the three params explicitly
-  # on each task instead.
   module_defaults:
-    group/ansible.controller.controller:
+    group/awx.awx.controller:
       controller_host: "{{ controller_host }}"
       controller_oauthtoken: "{{ controller_oauthtoken }}"
       validate_certs: "{{ controller_validate_certs }}"
 
   tasks:
     - name: Create the VM Operations organization
-      ansible.controller.organization:
+      awx.awx.organization:
         name: "{{ org_name }}"
         state: present
 
     - name: Create credentials
-      ansible.controller.credential:
+      awx.awx.credential:
         name: "{{ item.name }}"
         organization: "{{ org_name }}"
         credential_type: "{{ item.credential_type }}"
@@ -55,7 +49,7 @@
       no_log: true
 
     - name: Create the project (this Git repository)
-      ansible.controller.project:
+      awx.awx.project:
         name: "{{ project_name }}"
         organization: "{{ org_name }}"
         scm_type: git
@@ -66,7 +60,7 @@
         state: present
 
     - name: Register the ee-ocpvirt execution environment
-      ansible.controller.execution_environment:
+      awx.awx.execution_environment:
         name: "ee-ocpvirt"
         image: "{{ ee_ocpvirt_image }}"
         organization: "{{ org_name }}"
@@ -74,7 +68,7 @@
 
     # NOT EXECUTED unless apply_vmware_objects is true - reference only.
     - name: Register the ee-vmware execution environment
-      ansible.controller.execution_environment:
+      awx.awx.execution_environment:
         name: "ee-vmware"
         image: "{{ ee_vmware_image }}"
         organization: "{{ org_name }}"
@@ -82,13 +76,13 @@
       when: apply_vmware_objects
 
     - name: Create the VM Fleet inventory
-      ansible.controller.inventory:
+      awx.awx.inventory:
         name: "{{ inventory_name }}"
         organization: "{{ org_name }}"
         state: present
 
     - name: Add an SCM inventory source, synced from the project
-      ansible.controller.inventory_source:
+      awx.awx.inventory_source:
         name: "VM Fleet - from Git"
         inventory: "{{ inventory_name }}"
         organization: "{{ org_name }}"
@@ -101,7 +95,7 @@
         state: present
 
     - name: Create job templates
-      ansible.controller.job_template:
+      awx.awx.job_template:
         name: "{{ item.name }}"
         organization: "{{ org_name }}"
         job_type: run
