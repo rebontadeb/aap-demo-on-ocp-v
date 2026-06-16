@@ -36,6 +36,14 @@
                   | sort(attribute='metadata.creationTimestamp')
                   | last).metadata.name }}
 
+    - name: Remove any stuck restore object with the same name
+      kubernetes.core.k8s:
+        state: absent
+        api_version: snapshot.kubevirt.io/v1beta1
+        kind: VirtualMachineRestore
+        name: "restore-{{ tower_job_id | default('manual') }}-{{ vm_name }}"
+        namespace: "{{ ocpvirt_namespace }}"
+
     - name: Create VirtualMachineRestore for {{ vm_name }}
       kubernetes.core.k8s:
         state: present
