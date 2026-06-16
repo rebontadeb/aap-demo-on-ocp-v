@@ -1,22 +1,7 @@
 ---
-# Dynamic inventory sourced from OpenShift Virtualization (KubeVirt).
-# Used instead of hosts.yml so AAP discovers VMs at runtime via the K8s API.
-#
-# Requires:
-#   - kubevirt.core collection (present in ee-ocpvirt)
-#   - ocpvirt-api-token credential attached to the inventory source
-#     (injects K8S_AUTH_HOST, K8S_AUTH_API_KEY, K8S_AUTH_VERIFY_SSL)
-#
-# The plugin automatically sets ansible_connection: kubevirt.core.kubectl
-# on every discovered VM, so patch_and_healthcheck.yml connects via the
-# K8s API instead of direct SSH — no NodePort exposure needed.
-
 plugin: kubevirt.core.kubevirt
 connections:
   - namespaces:
       - vm-workloads
-
-# Add every discovered VM to the ocpvirt_vms group so backup_ocpvirt.yml
-# and restore_ocpvirt.yml (which use hosts: ocpvirt_vms) work without change.
 groups:
   ocpvirt_vms: "True"
